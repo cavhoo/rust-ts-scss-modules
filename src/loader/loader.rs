@@ -22,8 +22,9 @@ fn is_dist(entry: &DirEntry) -> bool {
     entry.path().to_str().map(|s| s.contains("dist")).unwrap_or(false)
 }
 
-pub fn get_scss_files() -> impl Iterator<Item = walkdir::DirEntry> {
-    WalkDir::new("/Users/hendrik/workspace/repos/engines/spawn-master")
+pub fn get_scss_files(path: &str) -> impl Iterator<Item = walkdir::DirEntry> {
+    println!("Searching for files in: {}", path);
+    WalkDir::new(String::from(path))
         .follow_links(false)
         .into_iter()
         .filter_map(Result::ok)

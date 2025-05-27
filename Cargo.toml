@@ -3,8 +3,15 @@ name = "ts-scss-modules"
 version = "0.1.0"
 edition = "2021"
 
+[dev-dependencies]
+serde_derive = "1.0.75"
+
+
 [dependencies]
 clap = { version = "4.5.29", features = ["derive"] }
 glob = "0.3.2"
 regex = "1.11.1"
 walkdir = "2.5.0"
+serde = "1.0.0"
+serde_json = "1.0.39"
+handlebars = "6.3.2"
