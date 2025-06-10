@@ -1,11 +1,12 @@
 use std::{fmt::Display, iter::Peekable, str::Chars};
 
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Element(String),          // e.g., "div",
     Property(String, String), // e.g., "color: $primary"
     Class(String),            // e.g., ".class-name"
-    NestedClass(String),      // e.g., "&.child" or "& .child"
+    NestedClass { name: String, parent: String },      // e.g., "&.child" or "& .child"
     Variable(String),         // e.g., "$primary"
     Import(String),           // @import or @use
     LBrace,                   // {
@@ -20,12 +21,18 @@ pub enum Token {
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Token::Element(name) => write!(f, "Element({})", name),
-            Token::Property(name, value) => write!(f, "Property({}, {})", name, value),
-            Token::Class(name) => write!(f, "Class({})", name),
-            Token::NestedClass(name) => write!(f, "NestedClass({})", name),
-            Token::Variable(name) => write!(f, "Variable({})", name),
-            Token::Import(name) => write!(f, "Import({})", name),
+            Token::Element(name) => write!(f, "{}", name),
+            Token::Property(name, value) => write!(f, "{}: {}", name, value),
+            Token::Class(name) => write!(f, "{}", name),
+            Token::NestedClass { name, parent } => {
+                if parent.is_empty() {
+                    write!(f, "{}", name)
+                } else {
+                    write!(f, "{}{}", parent, name)
+                }
+            }
+            Token::Variable(name) => write!(f, "{}", name),
+            Token::Import(name) => write!(f, "{}", name),
             Token::LBrace => write!(f, "{{"),
             Token::RBrace => write!(f, "}}"),
             Token::Colon => write!(f, ":"),
@@ -146,7 +153,10 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
-        Token::NestedClass(class)
+        Token::NestedClass {
+            name: class,
+            parent: String::new(), // Parent is empty for nested classes
+        }
     }
 
     fn consume_import(&mut self) -> Token {
@@ -274,7 +284,10 @@ impl<'a> Lexer<'a> {
 
             match token {
                 Token::Class(_)=> tokens.push(token), // Skip whitespace tokens
-                Token::NestedClass(_) =>tokens.push(token),  // Skip comment tokens
+                Token::NestedClass { name, parent: _ } => {
+                    let actual_parent = tokens[tokens.len() - 1].to_string(); // Get the parent class name
+                    tokens.push(Token::NestedClass { name, parent: actual_parent }); // Add nested class tokens to the list
+                },  // Skip comment tokens
                 _ => continue,        // Add other tokens to the list
             }
 

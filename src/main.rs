@@ -36,9 +36,10 @@ fn main() {
     println!("Parsing: {}", file.file_name().to_str().unwrap());
     let mut scssContent = fs::read_to_string(file.path()).unwrap();
     println!("{}", scssContent);
-    let mut lexer = Lexer::new(&scssContent);
     println!("Found {} .scss files parsing...", file_count);
-    println!("{:?}", lexer.tokenize());
+    let mut scss_file = ScssFile::new(file.path());
+    println!("{:?}", scss_file.class_names);
+    generator.generate_declaration(&scss_file);
     // for file in result {
     //     println!("Parsing: {}", file.file_name().to_str().unwrap());
     //     let scss_file = ScssFile::new(file.path());

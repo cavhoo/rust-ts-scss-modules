@@ -1,9 +1,7 @@
 use std::{
-    collections::HashSet, fmt::{self, Display, Formatter}, fs::File, io::{self, BufRead}, path::Path
+    collections::HashSet, fmt::{self, Display, Formatter}, fs::{self}, path::Path
 };
-
-
-use regex::Regex;
+use crate::lexer::lexer::{Lexer, Token};
 
 
 #[derive(Debug)]
@@ -14,55 +12,32 @@ pub struct ScssFile {
 
 impl ScssFile {
     pub fn new(path: &Path) -> Self {
-        let lines = ScssFile::read_lines(path).unwrap();
-
-
+        let content = fs::read_to_string(path).unwrap();
         Self {
-            class_names: ScssFile::extract_class_names(lines),
+            class_names: ScssFile::extract_class_names(content),
             file_path: path.display().to_string(),
         }
     }
 
 
-    fn extract_class_names(lines: io::Lines<io::BufReader<File>>) -> HashSet<String> {
-
+    fn extract_class_names(lines: String) -> HashSet<String> {
+        let mut lexer = Lexer::new(&lines);
+        let tokens = lexer.tokenize().into_iter();
         let mut class_names = HashSet::new();
-        for line in lines.map_while(Result::ok) {
-            if line.starts_with('@') {
-                continue;
+        for token in tokens {
+            match token {
+                Token::NestedClass { name, parent: _ } => {
+                    class_names.insert(name);
+                },
+                Token::Class(name) => {
+                    class_names.insert(name);
+                },
+                _ => continue,
             }
-
-            if line.chars().count() == 0 {
-                continue;
-            }
-
-            let class = ScssFile::parse_line_for_class(&line);
-
-            if class.chars().count() == 0 {
-                continue;
-            }
-
-            class_names.insert(class);
         }
         class_names
     }
 
-    fn parse_line_for_class(line: &str) -> String {
-        let regex_class = Regex::new(r"(?:[\.\#])([A-Za-z]+)(?:\s)").unwrap();
-
-        let Some(result) = regex_class.captures(line) else { return String::from("") };
-
-        String::from(&result[1])
-
-    }
-
-    pub fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-    where
-        P: AsRef<Path>,
-    {
-        let file = File::open(filename)?;
-        Ok(io::BufReader::new(file).lines())
-    }
 }
 
 
