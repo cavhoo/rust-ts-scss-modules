@@ -2,6 +2,7 @@ use std::{
     collections::HashSet, fmt::{self, Display, Formatter}, fs::File, io::{self, BufRead}, path::Path
 };
 
+
 use regex::Regex;
 
 
@@ -55,7 +56,7 @@ impl ScssFile {
 
     }
 
-    fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
+    pub fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
     where
         P: AsRef<Path>,
     {

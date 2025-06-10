@@ -1,0 +1,11 @@
+export type Styles = {
+{{#each class as |c| }}
+  {{c}}: string;
+{{/each}}
+}
+
+export type ClassNames = keyof Styles;
+
+declare const styles: Styles;
+
+export default styles;

@@ -1,5 +1,8 @@
-use std::{fs::{self}, path::Path};
+use std::{fs::File, path::Path};
 
+
+use handlebars::{to_json, Handlebars};
+use serde_json::Map;
 
 use crate::parser::scss::ScssFile;
 
@@ -16,6 +19,10 @@ impl Generator {
 		if scss_file.class_names.is_empty() {
 			return
 		}
+
+		let mut handlebars = Handlebars::new();
+		handlebars.register_template_file("default", "./templates/default.hbs").unwrap();
+
 		let declaration_file_path = Path::new(&scss_file.file_path);
 		let mut declaration_file_path_formatted = String::from("");
 		declaration_file_path_formatted.push_str(declaration_file_path.parent().unwrap().to_str().unwrap());
@@ -23,22 +30,14 @@ impl Generator {
 		declaration_file_path_formatted.push_str(declaration_file_path.file_name().unwrap().to_str().unwrap());
 		declaration_file_path_formatted.push_str(".d.ts");
 
-        let mut content_string = String::from("");
 
-        // First line create Style type
-        content_string.push_str("export type Styles = {\n");
+		let mut outfile = File::create(declaration_file_path_formatted).expect("Could not create file handle.");
 
-        // create entries for every class
-        for class in &scss_file.class_names {
-            content_string.push_str(&format!("\t{}: string;\n", class));
-        }
-        content_string.push_str("}\n");
+		let mut output_data = Map::new();
 
-		// Write declarationr
-        content_string.push_str("export type ClassNames = keyof Styles;\n\n");
-        content_string.push_str("declare const styles: Styles;\n\n");
-        content_string.push_str("export default styles;\n\n");
+		output_data.insert("class".to_string(), to_json(Vec::from_iter(&scss_file.class_names)));
 
-		fs::write(declaration_file_path_formatted, content_string).expect("Could not write stylesheet file");
+		handlebars.render_to_write("default", &to_json(output_data), &mut outfile).expect("Could not write to output file.");
+
     }
 }
