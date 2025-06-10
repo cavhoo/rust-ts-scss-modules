@@ -1,21 +1,22 @@
 use std::{fmt::Display, iter::Peekable, str::Chars};
 
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
-    Element(String),          // e.g., "div",
-    Property(String, String), // e.g., "color: $primary"
-    Class(String),            // e.g., ".class-name"
-    NestedClass { name: String, parent: String },      // e.g., "&.child" or "& .child"
-    Variable(String),         // e.g., "$primary"
-    Import(String),           // @import or @use
-    LBrace,                   // {
-    RBrace,                   // }
-    Colon,                    // :
-    Semicolon,                // ;
-    Whitespace,               // spaces, tabs, newlines
-    Comment(String),          // // or /* */
-    EOF,                      // End of file
+    Element(String),                              // e.g., "div",
+    Property(String, String),                     // e.g., "color: $primary"
+    Class(String),                                // e.g., ".class-name"
+    NestedClass { name: String, parent: String }, // e.g., "&.child" or "& .child"
+    Variable(String),                             // e.g., "$primary"
+    Import(String),                               // @import or @use
+    Media,                               // @import or @use
+    LBrace,                                       // {
+    RBrace,                                       // }
+    Colon,                                        // :
+    Semicolon,                                    // ;
+    Whitespace,                                   // spaces, tabs, newlines
+    Comment(String),                              // // or /* */
+    None,
+    EOF, // End of file
 }
 
 impl Display for Token {
@@ -40,6 +41,8 @@ impl Display for Token {
             Token::Whitespace => write!(f, "Whitespace"),
             Token::Comment(comment) => write!(f, "Comment({})", comment),
             Token::EOF => write!(f, "EOF"),
+            Token::None => write!(f, "None"),
+            Token::Media => write!(f, "Media"),
         }
     }
 }
@@ -77,6 +80,16 @@ impl<'a> Lexer<'a> {
             } else {
                 break;
             }
+        }
+    }
+
+    fn skip_to_next_line(&mut self) {
+        while let Some(c) = self.current_char {
+            if c == '\n' {
+                self.advance();
+                break;
+            }
+            self.advance();
         }
     }
 
@@ -162,6 +175,11 @@ impl<'a> Lexer<'a> {
     fn consume_import(&mut self) -> Token {
         let mut import = String::new();
         self.advance(); // Skip the '@'
+
+        if self.current_char == Some('m') {
+            return self.consume_media();
+        }
+
         while let Some(c) = self.current_char {
             if c.is_alphanumeric()
                 || c == '_'
@@ -179,6 +197,17 @@ impl<'a> Lexer<'a> {
             }
         }
         Token::Import(import)
+    }
+
+    fn consume_media(&mut self) -> Token {
+        while let Some(c) = self.current_char {
+            if c != '\n' {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        Token::Media // Placeholder for media queries, can be expanded later
     }
 
     fn consume_element_or_property(&mut self) -> Token {
@@ -219,6 +248,15 @@ impl<'a> Lexer<'a> {
                 || c == '%'
                 || c == '('
                 || c == ')'
+                || c == ','
+                || c == '!'
+                || c == '+'
+                || c == '*'
+                || c == '.'
+                || c == '\n'
+                || c == '\t'
+                || c == '/'
+                || c == '#'
             {
                 value.push(c);
                 self.advance();
@@ -242,8 +280,6 @@ impl<'a> Lexer<'a> {
                 self.skip_whitespace();
                 Token::Whitespace
             }
-            '/' if self.peek() == Some(&'/') => self.consume_single_line_comment(),
-            '/' if self.peek() == Some(&'*') => self.consume_multi_line_comment(),
             '{' => {
                 self.advance();
                 Token::LBrace
@@ -260,6 +296,15 @@ impl<'a> Lexer<'a> {
                 self.advance();
                 Token::Semicolon
             }
+            '-' => {
+                while let Some(next_char) = self.peek() {
+                    if next_char == &'\n' {
+                        break;
+                    }
+                    self.advance();
+                }
+                Token::Whitespace // Treat '-' as whitespace for now
+            }
             '$' => self.consume_variable(),
             '.' => self.consume_class(),
             '@' => self.consume_import(),
@@ -268,8 +313,8 @@ impl<'a> Lexer<'a> {
             }
             _ if c.is_alphabetic() || c == '_' => self.consume_element_or_property(),
             _ => {
-                panic!("Unexpected character: {}", c);
-            }
+                self.advance(); // Skip the unexpected character
+                Token::None }, // Handle unexpected characters
         }
     }
 
@@ -283,14 +328,16 @@ impl<'a> Lexer<'a> {
             }
 
             match token {
-                Token::Class(_)=> tokens.push(token), // Skip whitespace tokens
+                Token::Class(_) => tokens.push(token), // Skip whitespace tokens
                 Token::NestedClass { name, parent: _ } => {
                     let actual_parent = tokens[tokens.len() - 1].to_string(); // Get the parent class name
-                    tokens.push(Token::NestedClass { name, parent: actual_parent }); // Add nested class tokens to the list
-                },  // Skip comment tokens
-                _ => continue,        // Add other tokens to the list
+                    tokens.push(Token::NestedClass {
+                        name,
+                        parent: actual_parent,
+                    }); // Add nested class tokens to the list
+                } // Skip comment tokens
+                _ => continue,                         // Add other tokens to the list
             }
-
         }
         tokens
     }
@@ -372,7 +419,10 @@ mod tests {
     fn test_import_token() {
         let input = "@import 'styles.css';";
         let mut lexer = Lexer::new(input);
-        assert_eq!(lexer.next_token(), Token::Import("import 'styles.css'".to_string()));
+        assert_eq!(
+            lexer.next_token(),
+            Token::Import("import 'styles.css'".to_string())
+        );
     }
 
     #[test]
@@ -382,45 +432,55 @@ mod tests {
         assert_eq!(lexer.next_token(), Token::Element("div ".to_string()));
         assert_eq!(lexer.next_token(), Token::LBrace);
         assert_eq!(lexer.next_token(), Token::Whitespace);
-        assert_eq!(lexer.next_token(), Token::Property("color".to_string(), "$primary".to_string()));
+        assert_eq!(
+            lexer.next_token(),
+            Token::Property("color".to_string(), "$primary".to_string())
+        );
         assert_eq!(lexer.next_token(), Token::Whitespace);
         assert_eq!(lexer.next_token(), Token::RBrace);
     }
 
     #[test]
-    fn test_element_and_property_tokens_with_percent(){
-         let input = "div { height: 100%; }";
+    fn test_element_and_property_tokens_with_percent() {
+        let input = "div { height: 100%; }";
         let mut lexer = Lexer::new(input);
         assert_eq!(lexer.next_token(), Token::Element("div ".to_string()));
         assert_eq!(lexer.next_token(), Token::LBrace);
         assert_eq!(lexer.next_token(), Token::Whitespace);
-        assert_eq!(lexer.next_token(), Token::Property("height".to_string(), "100%".to_string()));
+        assert_eq!(
+            lexer.next_token(),
+            Token::Property("height".to_string(), "100%".to_string())
+        );
         assert_eq!(lexer.next_token(), Token::Whitespace);
         assert_eq!(lexer.next_token(), Token::RBrace);
-
     }
 
     #[test]
-    fn test_element_and_property_tokens_with_pixel(){
-         let input = "div { height: 100px; }";
+    fn test_element_and_property_tokens_with_pixel() {
+        let input = "div { height: 100px; }";
         let mut lexer = Lexer::new(input);
         assert_eq!(lexer.next_token(), Token::Element("div ".to_string()));
         assert_eq!(lexer.next_token(), Token::LBrace);
         assert_eq!(lexer.next_token(), Token::Whitespace);
-        assert_eq!(lexer.next_token(), Token::Property("height".to_string(), "100px".to_string()));
+        assert_eq!(
+            lexer.next_token(),
+            Token::Property("height".to_string(), "100px".to_string())
+        );
         assert_eq!(lexer.next_token(), Token::Whitespace);
         assert_eq!(lexer.next_token(), Token::RBrace);
-
     }
 
     #[test]
-    fn test_element_and_property_tokens_with_mixin(){
-         let input = "div { height: some(1); }";
+    fn test_element_and_property_tokens_with_mixin() {
+        let input = "div { height: some(1); }";
         let mut lexer = Lexer::new(input);
         assert_eq!(lexer.next_token(), Token::Element("div ".to_string()));
         assert_eq!(lexer.next_token(), Token::LBrace);
         assert_eq!(lexer.next_token(), Token::Whitespace);
-        assert_eq!(lexer.next_token(), Token::Property("height".to_string(), "some(1)".to_string()));
+        assert_eq!(
+            lexer.next_token(),
+            Token::Property("height".to_string(), "some(1)".to_string())
+        );
         assert_eq!(lexer.next_token(), Token::Whitespace);
         assert_eq!(lexer.next_token(), Token::RBrace);
     }

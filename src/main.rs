@@ -1,8 +1,7 @@
-use std::{fs, path::PathBuf};
+use std::{ path::PathBuf};
 
 use clap::Parser;
 use generator::generator::Generator;
-use lexer::lexer::Lexer;
 use loader::loader::get_scss_files;
 use parser::scss::ScssFile;
 
@@ -14,6 +13,7 @@ mod parser;
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Args {
+    /// Path to the root directory of your app
     #[arg(short, long)]
     path: String,
 }
@@ -32,17 +32,10 @@ fn main() {
     let result = get_scss_files(&absolute_path).collect::<Vec<_>>();
     let file_count = result.len();
 
-    let mut file = &result[0];
-    println!("Parsing: {}", file.file_name().to_str().unwrap());
-    let mut scssContent = fs::read_to_string(file.path()).unwrap();
-    println!("{}", scssContent);
     println!("Found {} .scss files parsing...", file_count);
-    let mut scss_file = ScssFile::new(file.path());
-    println!("{:?}", scss_file.class_names);
-    generator.generate_declaration(&scss_file);
-    // for file in result {
-    //     println!("Parsing: {}", file.file_name().to_str().unwrap());
-    //     let scss_file = ScssFile::new(file.path());
-    //     generator.generate_declaration(&scss_file);
-    // }
+    for file in result {
+        println!("Parsing: {}", file.file_name().to_str().unwrap());
+        let scss_file = ScssFile::new(file.path());
+        generator.generate_declaration(&scss_file);
+    }
 }
