@@ -22,19 +22,8 @@ impl ScssFile {
 
     fn extract_class_names(lines: String) -> HashSet<String> {
         let mut lexer = Lexer::new(&lines);
-        let tokens = lexer.tokenize().into_iter();
+        let tokens = lexer.collect::<Vec<Token>>();
         let mut class_names = HashSet::new();
-        for token in tokens {
-            match token {
-                Token::NestedClass { name, parent: _ } => {
-                    class_names.insert(name);
-                },
-                Token::Class(name) => {
-                    class_names.insert(name);
-                },
-                _ => continue,
-            }
-        }
         class_names
     }
 
