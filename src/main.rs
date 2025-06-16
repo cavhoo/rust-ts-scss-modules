@@ -1,17 +1,16 @@
-use std::{ path::PathBuf};
+use std::path::PathBuf;
 
 use clap::Parser;
 use generator::generator::Generator;
 use loader::loader::get_scss_files;
-use parser::scss::{self, ScssFile};
-use logger::logger::{Logger, LogLevel};
-
+use logger::logger::{LogLevel, Logger};
+use parser::scss::ScssFile;
 
 mod generator;
 mod lexer;
 mod loader;
-mod parser;
 mod logger;
+mod parser;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -21,7 +20,7 @@ struct Args {
     path: String,
 
     /// Log level for the application
-    #[arg(short, long, default_value = "warning", value_enum)]
+    #[arg(short, long, default_value = "info", value_enum)]
     log_level: String,
 }
 
@@ -51,7 +50,7 @@ fn main() {
     let file_count = result.len();
 
     let generator = Generator::new();
-    logger.debug(format!("Found {} .scss files parsing...", file_count).as_str());
+    logger.info(format!("Found {} .scss files parsing...", file_count).as_str());
     for file in result {
         logger.debug(format!("Parsing: {}", file.file_name().to_str().unwrap()).as_str());
         let scss_file = ScssFile::new(file.path());
