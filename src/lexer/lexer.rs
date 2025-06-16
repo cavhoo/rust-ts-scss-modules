@@ -543,14 +543,14 @@ mod tests {
             lexer.next_token(),
             Token {
                 kind: TokenKind::Op(Operator::NewLine),
-                value: "".to_string()
+                value: "\\n".to_string()
             }
         );
         assert_eq!(
             lexer.next_token(),
             Token {
                 kind: TokenKind::Element,
-                value: "div".to_string()
+                value: "div ".to_string()
             }
         );
     }
@@ -570,14 +570,14 @@ mod tests {
             lexer.next_token(),
             Token {
                 kind: TokenKind::Op(Operator::NewLine),
-                value: "".to_string()
+                value: "\\n".to_string()
             }
         );
         assert_eq!(
             lexer.next_token(),
             Token {
                 kind: TokenKind::Element,
-                value: "div".to_string()
+                value: "div ".to_string()
             }
         );
     }
@@ -634,35 +634,74 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_element_and_property_tokens_with_variables() {
-    //     let input = "div { color: $primary; }";
-    //     let mut lexer = Lexer::new(input);
-    //     assert_eq!(lexer.next_token(), Token::Element("div ".to_string()));
-    //     assert_eq!(lexer.next_token(), Token::LBrace);
-    //     assert_eq!(lexer.next_token(), Token::Whitespace);
-    //     assert_eq!(
-    //         lexer.next_token(),
-    //         Token::Property("color".to_string(), "$primary".to_string())
-    //     );
-    //     assert_eq!(lexer.next_token(), Token::Whitespace);
-    //     assert_eq!(lexer.next_token(), Token::RBrace);
-    // }
+    #[test]
+    fn test_element_and_property_tokens_with_variables() {
+        let input = "div { color: $primary; }";
+        let mut lexer = Lexer::new(input);
+        assert_eq!(lexer.next_token(),
+                   Token {
+            kind: TokenKind::Element,
+            value: "div ".to_string()
+                   }
+        );
 
-    // #[test]
-    // fn test_element_and_property_tokens_with_percent() {
-    //     let input = "div { height: 100%; }";
-    //     let mut lexer = Lexer::new(input);
-    //     assert_eq!(lexer.next_token(), Token::Element("div ".to_string()));
-    //     assert_eq!(lexer.next_token(), Token::LBrace);
-    //     assert_eq!(lexer.next_token(), Token::Whitespace);
-    //     assert_eq!(
-    //         lexer.next_token(),
-    //         Token::Property("height".to_string(), "100%".to_string())
-    //     );
-    //     assert_eq!(lexer.next_token(), Token::Whitespace);
-    //     assert_eq!(lexer.next_token(), Token::RBrace);
-    // }
+        assert_eq!(lexer.next_token(), Token {
+            kind: TokenKind::Op(Operator::LBrace),
+            value: "{".to_string()
+        });
+        assert_eq!(lexer.next_token(), Token {
+            kind: TokenKind::Indent(1),
+            value: "".to_string()
+        });
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Property("color".to_string()),
+                value: "$primary".to_string()
+            }
+        );
+        assert_eq!(lexer.next_token(), Token {
+            kind: TokenKind::Indent(1),
+            value: "".to_string()
+        });
+        assert_eq!(lexer.next_token(), Token {
+            kind: TokenKind::EOF,
+            value: "".to_string()
+        });
+    }
+
+    #[test]
+    fn test_element_and_property_tokens_with_percent() {
+        let input = "div { height: 100%; }";
+        let mut lexer = Lexer::new(input);
+        assert_eq!(lexer.next_token(), Token {
+            kind: TokenKind::Element,
+            value: "div ".to_string()
+        });
+        assert_eq!(lexer.next_token(), Token {
+            kind: TokenKind::Op(Operator::LBrace),
+            value: "{".to_string()
+        });
+        assert_eq!(lexer.next_token(), Token {
+            kind: TokenKind::Indent(1),
+            value: "".to_string()
+        });
+        assert_eq!(
+            lexer.next_token(),
+           Token {
+                kind: TokenKind::Property("height".to_string()),
+                value: "100%".to_string()
+            }
+        );
+        assert_eq!(lexer.next_token(), Token {
+            kind: TokenKind::Indent(1),
+            value: "".to_string()
+        });
+        assert_eq!(lexer.next_token(), Token {
+            kind: TokenKind::EOF,
+            value: "".to_string()
+        });
+    }
 
     // #[test]
     // fn test_element_and_property_tokens_with_pixel() {
