@@ -16,7 +16,7 @@ impl Generator {
     }
 
     pub fn generate_declaration(&self, scss_file: &ScssFile) {
-		if scss_file.class_names.is_empty() {
+		if scss_file.classes().is_empty() {
 			return
 		}
 
@@ -35,7 +35,7 @@ impl Generator {
 
 		let mut output_data = Map::new();
 
-		output_data.insert("class".to_string(), to_json(Vec::from_iter(&scss_file.class_names)));
+		output_data.insert("class".to_string(), to_json(Vec::from_iter(&scss_file.classes())));
 
 		handlebars.render_to_write("default", &to_json(output_data), &mut outfile).expect("Could not write to output file.");
 

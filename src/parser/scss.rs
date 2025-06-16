@@ -1,37 +1,38 @@
 use std::{
     collections::HashSet, fmt::{self, Display, Formatter}, fs::{self}, path::Path
 };
-use crate::lexer::lexer::{Lexer, Token};
+use crate::lexer::lexer::{Lexer, Token, TokenKind};
 
 
 #[derive(Debug)]
 pub struct ScssFile {
-    pub class_names: HashSet<String>,
+    pub tokens: Vec<Token>,
     pub file_path: String,
 }
 
 impl ScssFile {
     pub fn new(path: &Path) -> Self {
         let content = fs::read_to_string(path).unwrap();
+        let lexer = Lexer::new(&content);
+        let tokens = lexer.collect::<Vec<Token>>();
         Self {
-            class_names: ScssFile::extract_class_names(content),
+            tokens,
             file_path: path.display().to_string(),
         }
     }
 
+    pub fn classes(&self) -> HashSet<String> {
+        let mut classes = HashSet::new();
+        for token in &self.tokens {
+            if let TokenKind::Class(false) = token.kind {
+                classes.insert(token.value.to_string());
+            }
 
-    fn extract_class_names(lines: String) -> HashSet<String> {
-        let mut lexer = Lexer::new(&lines);
-        let tokens = lexer.collect::<Vec<Token>>();
-        let mut class_names = HashSet::new();
-        class_names
-    }
-
-}
-
-
-impl Display for ScssFile {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.class_names)
+            if let TokenKind::Class(true) = token.kind {
+                // If the class is nested, we still consider it a class
+                classes.insert(token.value.to_string());
+            }
+        }
+        classes
     }
 }

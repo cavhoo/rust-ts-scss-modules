@@ -1,6 +1,5 @@
 use std::{fmt::Display, iter::Peekable, str::Chars};
 
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum Operator {
     LBrace,
@@ -10,6 +9,7 @@ pub enum Operator {
     Colon,
     Semicolon,
     NewLine,
+    Plus
 }
 
 impl Display for Operator {
@@ -22,6 +22,7 @@ impl Display for Operator {
             Operator::Colon => write!(f, ":"),
             Operator::Semicolon => write!(f, ";"),
             Operator::NewLine => write!(f, "\\n"),
+            Operator::Plus => write!(f, "+"),
         }
     }
 }
@@ -30,6 +31,7 @@ impl Display for Operator {
 pub enum TokenKind {
     Element,
     Import,
+    Include,     // For @include directive
     Class(bool), // true for nested classes, false for regular classes
     Mixin,
     Variable,
@@ -52,6 +54,7 @@ impl Display for TokenKind {
         match self {
             TokenKind::Element => write!(f, "<element>"),
             TokenKind::Import => write!(f, "<import>"),
+            TokenKind::Include => write!(f, "<include>"),
             TokenKind::Mixin => write!(f, "<mixin>"),
             TokenKind::Media => write!(f, "<media>"),
             TokenKind::Variable => write!(f, "<variable>"),
@@ -75,7 +78,10 @@ impl<'a> Iterator for Lexer<'a> {
     type Item = Token;
     fn next(&mut self) -> Option<Self::Item> {
         match self.next_token() {
-            Token { kind: TokenKind::EOF, value: _ } => None,
+            Token {
+                kind: TokenKind::EOF,
+                value: _,
+            } => None,
             token => Some(token),
         }
     }
@@ -118,34 +124,81 @@ impl<'a> Lexer<'a> {
 
     fn resolve_char_as_token(&mut self, c: char, next: char) -> Token {
         match (c, next) {
-            ('\n', _) =>  {
+            ('\n', _) => {
                 self.advance();
-                Token { kind: TokenKind::Op(Operator::NewLine), value: String::from("") }
-            },
+                Token {
+                    kind: TokenKind::Op(Operator::NewLine),
+                    value: String::from("\\n"),
+                }
+            }
+            ('\r', _) => {
+                self.advance();
+                Token {
+                    kind: TokenKind::Op(Operator::NewLine),
+                    value: String::from("\\r"),
+                }
+            }
+            (' ', _) => self.consume_indentation(),
+            ('\t', _) => self.consume_indentation(),
             ('/', '/') => self.consume_single_line_comment(),
             ('/', '*') => self.consume_multi_line_comment(),
+            ('+', _) => {
+                self.advance();
+                Token {
+                    kind: TokenKind::Op(Operator::Plus),
+                    value: String::from(c),
+                }
+            }
             ('{', _) => {
                 self.advance();
-                Token { kind: TokenKind::Op(Operator::LBrace), value: String::from("{") }
+                Token {
+                    kind: TokenKind::Op(Operator::LBrace),
+                    value: String::from(c),
+                }
             }
             ('}', _) => {
                 self.advance();
-                Token { kind: TokenKind::Op(Operator::RBrace), value: String::from("}") }
+                Token {
+                    kind: TokenKind::Op(Operator::RBrace),
+                    value: String::from(c),
+                }
+            }
+            ('(', _) => {
+                self.advance();
+                Token {
+                    kind: TokenKind::Op(Operator::LParen),
+                    value: String::from(c),
+                }
+            }
+            (')', _) => {
+                self.advance();
+                Token {
+                    kind: TokenKind::Op(Operator::RParen),
+                    value: String::from(c),
+                }
             }
             (':', _) => {
                 self.advance();
-                Token { kind: TokenKind::Op(Operator::Colon), value: String::from(":") }
+                Token {
+                    kind: TokenKind::Op(Operator::Colon),
+                    value: String::from(c),
+                }
             }
             (';', _) => {
                 self.advance();
-                Token { kind: TokenKind::Op(Operator::Semicolon), value: String::from(";") }
+                Token {
+                    kind: TokenKind::Op(Operator::Semicolon),
+                    value: String::from(c),
+                }
             }
             ('$', _) => self.consume_variable(),
             ('.', _) => self.consume_class(),
-            ('@', _) => self.consume_import_or_mixin(),
+            ('@', 'i') => self.consume_import_or_include(),
+            ('@', 'm') => self.consume_mixin_or_media(),
             ('&', _) if self.peek() == Some(&' ') || self.peek() == Some(&'.') => {
                 self.consume_nested_class()
             }
+            ('&', ':') => self.consume_pseudo_class(),
             _ if c.is_whitespace() && c != '\n' => self.consume_indentation(),
             _ if c.is_alphabetic() || c == '_' => self.consume_element_or_property(),
             _ => {
@@ -164,26 +217,6 @@ impl<'a> Lexer<'a> {
     fn advance(&mut self) {
         self.current_char = self.input.next();
         self.position += 1;
-    }
-
-    fn skip_whitespace(&mut self) {
-        while let Some(c) = self.current_char {
-            if c.is_whitespace() {
-                self.advance();
-            } else {
-                break;
-            }
-        }
-    }
-
-    fn skip_to_next_line(&mut self) {
-        while let Some(c) = self.current_char {
-            if c == '\n' {
-                self.advance();
-                break;
-            }
-            self.advance();
-        }
     }
 
     fn consume_indentation(&mut self) -> Token {
@@ -249,7 +282,10 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
-        Token{ kind: TokenKind::Variable, value: variable }
+        Token {
+            kind: TokenKind::Variable,
+            value: variable,
+        }
     }
 
     fn consume_class(&mut self) -> Token {
@@ -263,7 +299,10 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
-        Token { kind: TokenKind::Class(false), value: class }
+        Token {
+            kind: TokenKind::Class(false),
+            value: class,
+        }
     }
 
     fn consume_nested_class(&mut self) -> Token {
@@ -281,29 +320,50 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
-       Token {
+        Token {
             kind: TokenKind::Class(true),
             value: class,
         }
     }
 
-    fn consume_import_or_mixin(&mut self) -> Token {
+    fn consume_pseudo_class(&mut self) -> Token {
+        let mut pseudo_class = String::new();
+        self.advance(); // Skip the ':'
+        while let Some(c) = self.current_char {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                pseudo_class.push(c);
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        Token {
+            kind: TokenKind::Property(pseudo_class), // Pseudo-classes are treated as properties
+            value: String::from(""),
+        }
+    }
+
+    fn consume_import_or_include(&mut self) -> Token {
         let mut import = String::new();
         self.advance(); // Skip the '@'
 
-        if self.current_char == Some('m') {
-            return self.consume_media();
-        }
+        let mut is_import = true;
 
+        if self.current_char == Some('i') && self.peek() == Some(&'n') {
+            is_import = false; // It's an include, not an import
+        }
         while let Some(c) = self.current_char {
             if c.is_alphanumeric()
                 || c == '_'
                 || c == '-'
                 || c == '/'
                 || c == '.'
+                || c == ','
                 || c == '"'
                 || c == '\''
                 || c == ' '
+                || c == '('
+                || c == ')'
             {
                 import.push(c);
                 self.advance();
@@ -312,8 +372,33 @@ impl<'a> Lexer<'a> {
             }
         }
         Token {
-            kind: TokenKind::Import,
+            kind: if is_import {
+                TokenKind::Import
+            } else {
+                TokenKind::Include
+            },
             value: import,
+        }
+    }
+
+    fn consume_mixin_or_media(&mut self) -> Token {
+        let mut mixin = String::new();
+        self.advance(); // Skip the '@'
+        if self.current_char == Some('m') && self.peek() == Some(&'e') {
+            return self.consume_media();
+        }
+
+        while let Some(c) = self.current_char {
+            if c.is_alphanumeric() || c == '_' || c == '-' {
+                mixin.push(c);
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        Token {
+            kind: TokenKind::Mixin,
+            value: mixin,
         }
     }
 
@@ -341,13 +426,20 @@ impl<'a> Lexer<'a> {
             if self.peek() == Some(&':') {
                 element.push(c);
                 self.advance(); // Skip the character
-                token = Token {
-                    kind: TokenKind::Property(element.clone()),
-                    value: self.consume_property_value(),
-                };
-                break;
+                if self.peek() == Some(&' ') {
+                    self.advance(); // Skip the ' '
+                    token = Token {
+                        kind: TokenKind::Property(element.clone()),
+                        value: self.consume_property_value(),
+                    };
+                    break;
+                }
             }
-            if c.is_alphanumeric() || c == '-' || c == '_' || c == '"' || c == '%' {
+            if c.is_alphanumeric()
+                || c == '-'
+                || c == '_'
+                || c == ' '
+            {
                 element.push(c);
                 self.advance();
             } else {
@@ -414,14 +506,26 @@ mod tests {
     fn test_class() {
         let input = ".class-name { color: $primary; }";
         let mut lexer = Lexer::new(input);
-        assert_eq!(lexer.next_token(), Token { kind: TokenKind::Class(false), value: "class-name".to_string() });
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Class(false),
+                value: "class-name".to_string()
+            }
+        );
     }
 
     #[test]
     fn test_skip_whitespace() {
         let input = "  div { color: $primary; }";
         let mut lexer = Lexer::new(input);
-        assert_eq!(lexer.next_token(), Token { kind: TokenKind::Indent(2), value: "".to_string() });
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Indent(2),
+                value: "".to_string()
+            }
+        );
     }
 
     #[test]
@@ -435,8 +539,20 @@ mod tests {
                 value: " This is a comment".to_string()
             }
         );
-        assert_eq!(lexer.next_token(), Token { kind: TokenKind::Op(Operator::NewLine), value: "".to_string() });
-        assert_eq!(lexer.next_token(), Token { kind: TokenKind::Element, value: "div".to_string() });
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Op(Operator::NewLine),
+                value: "".to_string()
+            }
+        );
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Element,
+                value: "div".to_string()
+            }
+        );
     }
 
     #[test]
@@ -450,9 +566,20 @@ mod tests {
                 value: " This is a\nmulti-line comment ".to_string()
             }
         );
-        assert_eq!(lexer.next_token(), Token { kind: TokenKind::Op(Operator::NewLine), value: "".to_string() });
-        assert_eq!(lexer.next_token(), Token { kind: TokenKind::Element, value: "div".to_string() });
-
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Op(Operator::NewLine),
+                value: "".to_string()
+            }
+        );
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Element,
+                value: "div".to_string()
+            }
+        );
     }
 
     #[test]
