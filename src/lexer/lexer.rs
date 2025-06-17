@@ -1,5 +1,7 @@
 use std::{fmt::Display, iter::Peekable, str::Chars};
 
+use log::warn;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum Operator {
     LBrace,
@@ -202,6 +204,7 @@ impl<'a> Lexer<'a> {
             _ if c.is_whitespace() && c != '\n' => self.consume_indentation(),
             _ if c.is_alphabetic() || c == '_' => self.consume_element_or_property(),
             _ => {
+                warn!("Unexpected character at position {}: '{}'", self.position, c);
                 Token {
                     kind: TokenKind::EOF,
                     value: String::new(),
@@ -702,34 +705,4 @@ mod tests {
             value: "".to_string()
         });
     }
-
-    // #[test]
-    // fn test_element_and_property_tokens_with_pixel() {
-    //     let input = "div { height: 100px; }";
-    //     let mut lexer = Lexer::new(input);
-    //     assert_eq!(lexer.next_token(), Token::Element("div ".to_string()));
-    //     assert_eq!(lexer.next_token(), Token::LBrace);
-    //     assert_eq!(lexer.next_token(), Token::Whitespace);
-    //     assert_eq!(
-    //         lexer.next_token(),
-    //         Token::Property("height".to_string(), "100px".to_string())
-    //     );
-    //     assert_eq!(lexer.next_token(), Token::Whitespace);
-    //     assert_eq!(lexer.next_token(), Token::RBrace);
-    // }
-
-    // #[test]
-    // fn test_element_and_property_tokens_with_mixin() {
-    //     let input = "div { height: some(1); }";
-    //     let mut lexer = Lexer::new(input);
-    //     assert_eq!(lexer.next_token(), Token::Element("div ".to_string()));
-    //     assert_eq!(lexer.next_token(), Token::LBrace);
-    //     assert_eq!(lexer.next_token(), Token::Whitespace);
-    //     assert_eq!(
-    //         lexer.next_token(),
-    //         Token::Property("height".to_string(), "some(1)".to_string())
-    //     );
-    //     assert_eq!(lexer.next_token(), Token::Whitespace);
-    //     assert_eq!(lexer.next_token(), Token::RBrace);
-    // }
 }

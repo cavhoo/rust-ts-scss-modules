@@ -1,6 +1,5 @@
 use walkdir::{DirEntry, WalkDir};
-
-use crate::logger;
+use log::info;
 
 fn matches_file_type(entry: &DirEntry, file_type: &str) -> bool {
     entry
@@ -43,8 +42,7 @@ fn is_dist(entry: &DirEntry) -> bool {
 }
 
 pub fn get_scss_files(path: &str) -> impl Iterator<Item = walkdir::DirEntry> {
-    let logger = logger::logger::Logger::new(logger::logger::LogLevel::Info);
-    logger.info(format!("Searching for files in: {}", path).as_str());
+    info!("Searching for files in: {}", path);
     WalkDir::new(String::from(path))
         .follow_links(false)
         .into_iter()

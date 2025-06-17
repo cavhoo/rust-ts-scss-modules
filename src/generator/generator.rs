@@ -5,14 +5,20 @@ use handlebars::{to_json, Handlebars};
 use serde_json::Map;
 
 use crate::parser::scss::ScssFile;
+use crate::generator::templates::Templates;
 
 
 #[derive(Debug)]
-pub struct Generator {}
+pub struct Generator {
+	pub templates: Templates,
+}
+
 
 impl Generator {
     pub fn new() -> Self {
-        Generator {}
+        Generator {
+			templates: Templates::new(),
+		}
     }
 
     pub fn generate_declaration(&self, scss_file: &ScssFile) {
@@ -21,7 +27,7 @@ impl Generator {
 		}
 
 		let mut handlebars = Handlebars::new();
-		handlebars.register_template_file("default", "./templates/default.hbs").unwrap();
+		handlebars.register_template_string("default", self.templates.default.clone()).unwrap();
 
 		let declaration_file_path = Path::new(&scss_file.file_path);
 		let mut declaration_file_path_formatted = String::from("");

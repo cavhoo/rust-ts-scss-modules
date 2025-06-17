@@ -1,15 +1,17 @@
 use std::path::PathBuf;
+use log::{debug, info};
+use env_logger::Env;
 
 use clap::Parser;
+
+
 use generator::generator::Generator;
 use loader::loader::get_scss_files;
-use logger::logger::{LogLevel, Logger};
 use parser::scss::ScssFile;
 
 mod generator;
 mod lexer;
 mod loader;
-mod logger;
 mod parser;
 
 #[derive(Parser, Debug)]
@@ -26,19 +28,12 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    let srcdir = PathBuf::from(args.path);
-    let log_level = match args.log_level.as_str() {
-        "debug" => LogLevel::Debug,
-        "info" => LogLevel::Info,
-        "warning" => LogLevel::Warning,
-        "error" => LogLevel::Error,
-        _ => {
-            eprintln!("Invalid log level specified. Defaulting to 'warning'.");
-            LogLevel::Warning
-        }
-    };
 
-    let logger = Logger::new(log_level);
+    // Initialize the logger with the specified log level
+    let env = Env::default().filter_or("TS_SCSS_LOG_LEVEL", args.log_level);
+    env_logger::init_from_env(env);
+
+    let srcdir = PathBuf::from(args.path);
     let absolute_path = srcdir
         .canonicalize()
         .unwrap()
@@ -50,13 +45,13 @@ fn main() {
     let file_count = result.len();
 
     let generator = Generator::new();
-    logger.info(format!("Found {} .scss files parsing...", file_count).as_str());
+    info!("Found {} .scss files parsing...", file_count);
     for file in result {
-        logger.debug(format!("Parsing: {}", file.file_name().to_str().unwrap()).as_str());
+        debug!("Parsing: {}", file.file_name().to_str().unwrap());
         let scss_file = ScssFile::new(file.path());
-        logger.debug(format!("Classes found: {:?}", scss_file.classes()).as_str());
+        debug!("Classes found: {:?}", scss_file.classes());
         generator.generate_declaration(&scss_file);
     }
 
-    logger.info(format!("Parsed {} files successfully.", file_count).as_str());
+    info!("Parsed {} files successfully.", file_count);
 }

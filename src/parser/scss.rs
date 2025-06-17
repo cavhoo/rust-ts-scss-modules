@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet, fmt::{self, Display, Formatter}, fs::{self}, path::Path
+    collections::HashSet, fs::{self}, path::Path
 };
 use crate::lexer::lexer::{Lexer, Token, TokenKind};
 
