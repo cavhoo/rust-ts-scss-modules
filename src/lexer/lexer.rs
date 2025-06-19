@@ -1,6 +1,6 @@
 use std::{fmt::Display, iter::Peekable, str::Chars};
 
-use log::warn;
+use log::debug;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Operator {
@@ -11,7 +11,7 @@ pub enum Operator {
     Colon,
     Semicolon,
     NewLine,
-    Plus
+    Plus,
 }
 
 impl Display for Operator {
@@ -31,18 +31,19 @@ impl Display for Operator {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TokenKind {
-    Element,
-    Import,
-    Include,     // For @include directive
-    Class(bool), // true for nested classes, false for regular classes
-    Mixin,
-    Variable,
-    Media,
-    Property(String),
-    Comment,
-    Op(Operator),
-    Indent(usize), // Indentation level
-    EOF,
+    Element,          // For HTML elements like div, span
+    Import,           // For @import or @use directive
+    Include,          // For @include directive
+    Class(bool),      // true for nested classes, false for regular classes
+    Mixin,            // For @mixin directive
+    Variable,         // For variables like $primary
+    CssVariable,      // For CSS variables like --primary-color
+    Media,            // For @media directive
+    Property(String), // For properties like color, font-size
+    Comment,          // For comments
+    Op(Operator),     // Operators like +, {, }, (, ), :, ;
+    Indent(usize),    // Indentation level
+    EOF,              // End of file
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -60,6 +61,7 @@ impl Display for TokenKind {
             TokenKind::Mixin => write!(f, "<mixin>"),
             TokenKind::Media => write!(f, "<media>"),
             TokenKind::Variable => write!(f, "<variable>"),
+            TokenKind::CssVariable => write!(f, "<css-variable>"),
             TokenKind::Comment => write!(f, "<comment>"),
             TokenKind::Property(prop) => write!(f, "<property: {prop}>"),
             TokenKind::Class(nested) => write!(f, "<class:{nested}>"),
@@ -193,9 +195,11 @@ impl<'a> Lexer<'a> {
                     value: String::from(c),
                 }
             }
+            ('-', '-') => self.consume_css_variable(),
             ('$', _) => self.consume_variable(),
             ('.', _) => self.consume_class(),
             ('@', 'i') => self.consume_import_or_include(),
+            ('@', 'u') => self.consume_use(),
             ('@', 'm') => self.consume_mixin_or_media(),
             ('&', _) if self.peek() == Some(&' ') || self.peek() == Some(&'.') => {
                 self.consume_nested_class()
@@ -204,7 +208,10 @@ impl<'a> Lexer<'a> {
             _ if c.is_whitespace() && c != '\n' => self.consume_indentation(),
             _ if c.is_alphabetic() || c == '_' => self.consume_element_or_property(),
             _ => {
-                warn!("Unexpected character at position {}: '{}'", self.position, c);
+                debug!(
+                    "Unexpected character at position {}: '{}'",
+                    self.position, c
+                );
                 Token {
                     kind: TokenKind::EOF,
                     value: String::new(),
@@ -384,6 +391,37 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    fn consume_use(&mut self) -> Token {
+        let mut use_statement = String::new();
+        self.advance(); // Skip the '@'
+
+        while let Some(c) = self.current_char {
+            println!("Current char: {}", c);
+            if c.is_alphanumeric()
+                || c == '_'
+                || c == '-'
+                || c == '/'
+                || c == '.'
+                || c == ','
+                || c == '"'
+                || c == '\''
+                || c == ' '
+                || c == '('
+                || c == ')'
+            {
+                use_statement.push(c);
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        Token {
+            kind: TokenKind::Include, // Use is treated as an include in this context
+            value: use_statement,
+        }
+    }
+
     fn consume_mixin_or_media(&mut self) -> Token {
         let mut mixin = String::new();
         self.advance(); // Skip the '@'
@@ -438,11 +476,7 @@ impl<'a> Lexer<'a> {
                     break;
                 }
             }
-            if c.is_alphanumeric()
-                || c == '-'
-                || c == '_'
-                || c == ' '
-            {
+            if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' {
                 element.push(c);
                 self.advance();
             } else {
@@ -482,6 +516,7 @@ impl<'a> Lexer<'a> {
                 || c == '\t'
                 || c == '/'
                 || c == '#'
+                || c == '!'
             {
                 value.push(c);
                 self.advance();
@@ -490,6 +525,24 @@ impl<'a> Lexer<'a> {
             }
         }
         value
+    }
+
+    fn consume_css_variable(&mut self) -> Token {
+        let mut variable = String::new();
+        self.advance(); // Skip the first '-'
+        self.advance(); // Skip the second '-'
+        while let Some(c) = self.current_char {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                variable.push(c);
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        Token {
+            kind: TokenKind::CssVariable,
+            value: variable,
+        }
     }
 }
 
@@ -641,21 +694,28 @@ mod tests {
     fn test_element_and_property_tokens_with_variables() {
         let input = "div { color: $primary; }";
         let mut lexer = Lexer::new(input);
-        assert_eq!(lexer.next_token(),
-                   Token {
-            kind: TokenKind::Element,
-            value: "div ".to_string()
-                   }
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Element,
+                value: "div ".to_string()
+            }
         );
 
-        assert_eq!(lexer.next_token(), Token {
-            kind: TokenKind::Op(Operator::LBrace),
-            value: "{".to_string()
-        });
-        assert_eq!(lexer.next_token(), Token {
-            kind: TokenKind::Indent(1),
-            value: "".to_string()
-        });
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Op(Operator::LBrace),
+                value: "{".to_string()
+            }
+        );
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Indent(1),
+                value: "".to_string()
+            }
+        );
         assert_eq!(
             lexer.next_token(),
             Token {
@@ -663,46 +723,80 @@ mod tests {
                 value: "$primary".to_string()
             }
         );
-        assert_eq!(lexer.next_token(), Token {
-            kind: TokenKind::Indent(1),
-            value: "".to_string()
-        });
-        assert_eq!(lexer.next_token(), Token {
-            kind: TokenKind::EOF,
-            value: "".to_string()
-        });
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Indent(1),
+                value: "".to_string()
+            }
+        );
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::EOF,
+                value: "".to_string()
+            }
+        );
     }
 
     #[test]
     fn test_element_and_property_tokens_with_percent() {
         let input = "div { height: 100%; }";
         let mut lexer = Lexer::new(input);
-        assert_eq!(lexer.next_token(), Token {
-            kind: TokenKind::Element,
-            value: "div ".to_string()
-        });
-        assert_eq!(lexer.next_token(), Token {
-            kind: TokenKind::Op(Operator::LBrace),
-            value: "{".to_string()
-        });
-        assert_eq!(lexer.next_token(), Token {
-            kind: TokenKind::Indent(1),
-            value: "".to_string()
-        });
         assert_eq!(
             lexer.next_token(),
-           Token {
+            Token {
+                kind: TokenKind::Element,
+                value: "div ".to_string()
+            }
+        );
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Op(Operator::LBrace),
+                value: "{".to_string()
+            }
+        );
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Indent(1),
+                value: "".to_string()
+            }
+        );
+        assert_eq!(
+            lexer.next_token(),
+            Token {
                 kind: TokenKind::Property("height".to_string()),
                 value: "100%".to_string()
             }
         );
-        assert_eq!(lexer.next_token(), Token {
-            kind: TokenKind::Indent(1),
-            value: "".to_string()
-        });
-        assert_eq!(lexer.next_token(), Token {
-            kind: TokenKind::EOF,
-            value: "".to_string()
-        });
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Indent(1),
+                value: "".to_string()
+            }
+        );
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::EOF,
+                value: "".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_css_variable_token() {
+        let input = "--primary-color: var(--color) !important;";
+        let mut lexer = Lexer::new(input);
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::CssVariable,
+                value: "primary-color".to_string()
+            }
+        );
     }
 }
