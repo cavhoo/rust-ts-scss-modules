@@ -396,7 +396,6 @@ impl<'a> Lexer<'a> {
         self.advance(); // Skip the '@'
 
         while let Some(c) = self.current_char {
-            println!("Current char: {}", c);
             if c.is_alphanumeric()
                 || c == '_'
                 || c == '-'

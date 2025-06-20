@@ -21,9 +21,9 @@ impl Generator {
 		}
     }
 
-    pub fn generate_declaration(&self, scss_file: &ScssFile) {
+    pub fn generate_declaration(&self, scss_file: &ScssFile) -> Result<bool, String> {
 		if scss_file.classes().is_empty() {
-			return
+			return Ok(false);
 		}
 
 		let mut handlebars = Handlebars::new();
@@ -43,7 +43,11 @@ impl Generator {
 
 		output_data.insert("class".to_string(), to_json(Vec::from_iter(&scss_file.classes())));
 
-		handlebars.render_to_write("default", &to_json(output_data), &mut outfile).expect("Could not write to output file.");
+		let render_result = handlebars.render_to_write("default", &to_json(output_data), &mut outfile);
 
-    }
+		match render_result {
+			Ok(_) => Ok(true),
+			Err(e) => Err(format!("Error rendering template: {}", e)),
+		}
+	}
 }
