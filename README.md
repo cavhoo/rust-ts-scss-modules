@@ -13,7 +13,14 @@ such a learning project.
 This project can be used with:
 
 ``` shell
-cargo run -- --path <path to your project> 
+cargo run -- --path <path to your project>
+```
+
+or optional to increase thread count (Default: 4)
+
+```shell
+
+cargo run -- --threads 8 --path <path to your project>
 ```
 
 It will traverse all the files and folders scanning for .scss files
@@ -23,3 +30,13 @@ css modules within typescript.
 ## What it's not
 
 A production ready optimized library to be used as part of your tool chain.
+
+
+## Roadmap
+
+* [ ] Lexical scss parsing.
+* [ ] Handlebars template for standard scss module declarations in typescript.
+* [ ] Complex parsing of bigger scss files
+* [ ] Support for custom handle bars templates loaded via path
+* [ ] Build binary for download
+* [ ] Write proper documentation
