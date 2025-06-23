@@ -1,5 +1,6 @@
 #[derive(Debug)]
 pub struct Templates {
+    /// Default d.ts. file template.
     pub default: String,
 }
 

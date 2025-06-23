@@ -338,6 +338,7 @@ impl<'a> Lexer<'a> {
 
     fn consume_pseudo_class(&mut self) -> Token {
         let mut pseudo_class = String::new();
+        self.advance(); // Skip the '&'
         self.advance(); // Skip the ':'
         while let Some(c) = self.current_char {
             if c.is_alphanumeric() || c == '-' || c == '_' {
@@ -578,6 +579,19 @@ mod tests {
             lexer.next_token(),
             Token {
                 kind: TokenKind::Indent(2),
+                value: "".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_pseudo_class() {
+        let input = "&:hover { color: $primary; }";
+        let mut lexer = Lexer::new(input);
+        assert_eq!(
+            lexer.next_token(),
+            Token {
+                kind: TokenKind::Property("hover".to_string()),
                 value: "".to_string()
             }
         );
